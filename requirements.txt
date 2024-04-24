@@ -3,3 +3,9 @@
 # Manually managing azure-functions-worker may cause unexpected issues
 
 azure-functions
+openai
+python-dotenv 
+azure-identity 
+azure-storage-blob==12.9.0
+pandas
+
