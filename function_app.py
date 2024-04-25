@@ -4,12 +4,14 @@ import subprocess
 import json
 import os
 import json
+import sys
 from openai import AzureOpenAI
 import time
 import pandas as pd
 from dotenv import load_dotenv
 from azure.storage.blob import BlobClient, ContentSettings
-
+from azure.cli.core import get_default_cli
+# from azure.cli import invoke
 
 load_dotenv()
 
@@ -26,6 +28,10 @@ AZURE_STORAGE_CONNECTION_STRING = os.getenv('AZURE_STORAGE_CONNECTION_STRING', N
 AZURE_STORAGE_CONTAINER_NAME_IMAGES = os.getenv('AZURE_STORAGE_CONTAINER_NAME_IMAGES', None)
 AZURE_STORAGE_CONTAINER_NAME_DOCS = os.getenv('AZURE_STORAGE_CONTAINER_NAME_DOCS', None)
 
+AZURE_APP_ID = os.getenv('AZURE_APP_ID', None)
+AZURE_APP_SECRET = os.getenv('AZURE_APP_SECRET', None)
+AZURE_TENANT_ID = os.getenv('AZURE_TENANT_ID', None)
+
 # DIR_IN = os.path.join("data","in")
 # DIR_OUT = os.path.join("data","out")
 # DIR_OUT_IMAGES = os.path.join("data","out", "images")
@@ -34,16 +40,19 @@ def get_services(verbose=False):
     # Command to call the command-line program
     command = "az cognitiveservices account list -g rg-ai-openai"
 
-    # Execute the command and capture the output
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    output, error = process.communicate()
+    # # Execute the command and capture the output
+    # process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    # output, error = process.communicate()
 
-    # Decode the output to a string, then load it into a Python variable as JSON
-    if process.returncode == 0:
-        json_data = json.loads(output.decode('utf-8'))
-    else:
-        print("Error executing command:", error.decode('utf-8'))
-        json_data = None
+    # # Decode the output to a string, then load it into a Python variable as JSON
+    # if process.returncode == 0:
+    #     json_data = json.loads(output.decode('utf-8'))
+    # else:
+    #     print("Error executing command:", error.decode('utf-8'))
+    #     json_data = None
+
+    json_data = az_cli_run(command)
+    logging.info(f"Found {len(json_data)} services.")
 
     # Now json_data contains the list of JSONs
     # We can now extract the details of the cognitive service account
@@ -73,14 +82,16 @@ def get_services(verbose=False):
     for openai_name, _ in services.items():
         # print(key, value)
         command = "az cognitiveservices account keys list -g rg-ai-openai -n " + openai_name
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        output, error = process.communicate()
+        # process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        # output, error = process.communicate()
 
-        if process.returncode == 0:
-            json_data = json.loads(output.decode('utf-8'))
-        else:
-            print("Error executing command:", error.decode('utf-8'))
-            json_data = None
+        # if process.returncode == 0:
+        #     json_data = json.loads(output.decode('utf-8'))
+        # else:
+        #     print("Error executing command:", error.decode('utf-8'))
+        #     json_data = None
+
+        json_data = az_cli_run(command)
 
         key = json_data["key1"]
 
@@ -98,16 +109,18 @@ def get_deployments(name):
 
     command = f"az cognitiveservices account deployment list --name {name} --resource-group rg-ai-openai"
 
-    # Execute the command and capture the output
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    output, error = process.communicate()
+    # # Execute the command and capture the output
+    # process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    # output, error = process.communicate()
 
-    # Decode the output to a string, then load it into a Python variable as JSON
-    if process.returncode == 0:
-        json_data = json.loads(output.decode('utf-8'))
-    else:
-        print("Error executing command:", error.decode('utf-8'))
-        json_data = None
+    # # Decode the output to a string, then load it into a Python variable as JSON
+    # if process.returncode == 0:
+    #     json_data = json.loads(output.decode('utf-8'))
+    # else:
+    #     print("Error executing command:", error.decode('utf-8'))
+    #     json_data = None
+
+    json_data = az_cli_run(command)
 
     # json_data = get_deployments("openaimma-swedencentral")
     deployments = {}
@@ -254,7 +267,7 @@ def run_test(model_family = "gpt-4", filter_to_regions = []):
     # df.dtypes
     # current date and time to string YYYY-MM-DD HH-MM-SS
     current_time = time.strftime("%Y%m%d-%H%M%S")
-    df.to_csv(f"call_log{current_time}.csv", index=False)
+    # df.to_csv(f"call_log{current_time}.csv", index=False)
 
     # Convert DataFrame to CSV string
     csv_data = df.to_csv(index=False)
@@ -294,6 +307,19 @@ def write_doc_on_blob_storage(doc, filename):
         blob_client.upload_blob(document_data, content_settings=content_settings, overwrite=True)
         return doc_url
 
+def az_cli_run (args_str, verbose=False):
+    args = args_str.split()[1:]
+    if verbose:
+        logging.info(f"az_cli_run: {args}")
+    cli = get_default_cli()
+    cli.invoke(args)
+    if cli.result.result:
+        # return cli.result.result
+        # logging.info(f"result {cli.result.result}`")
+        return cli.result.result
+    elif cli.result.error:
+        raise cli.result.error
+    return True
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
@@ -334,6 +360,8 @@ def openai_status_run(req: func.HttpRequest) -> func.HttpResponse:
     #          status_code=200
     #     )
 
+
+
 @app.timer_trigger(schedule="0 5 * * * *", arg_name="myTimer", run_on_startup=True,
               use_monitor=False) 
 def openai_status_run_scheduled(myTimer: func.TimerRequest) -> None:
@@ -341,14 +369,51 @@ def openai_status_run_scheduled(myTimer: func.TimerRequest) -> None:
     if myTimer.past_due:
         logging.info('The timer is past due!')
 
-    start_time = time.time()
-    run_test(model_family="gpt-4")
-    end_time = time.time()
-    duration1 = end_time - start_time
+    # az_cli = get_default_cli()
+    # exit_code = az_cli.invoke(['login', '--service-principal', '-u', AZURE_APP_ID, '-p', AZURE_APP_SECRET,'--tenant', AZURE_TENANT_ID])
+    # # exit_code = az_cli.invoke(command.split())
+    
+    command = f"az login --service-principal -u {AZURE_APP_ID} -p {AZURE_APP_SECRET} --tenant {AZURE_TENANT_ID}"
+    json_data = az_cli_run(command, verbose = False)
+    # for item in json_data:
+    #     print(item)
+    
+    # command = "az cognitiveservices account list -g rg-ai-openai"
+    # ret = az_cli_run(command)
 
-    start_time = time.time()
-    run_test(model_family="gpt-35-turbo")
-    end_time = time.time()
-    duration2 = end_time - start_time
-    duration_all = duration1 + duration2
-    logging.info('All tests run succesfully: Test for gpt-4 took {duration1} seconds, Test for gpt-35-turbo took {duration2} seconds. Total duration {duration_all} seconds.')
+    # services = {}
+
+    # for item in json_data:    
+
+    #     endpoint = item["properties"]["endpoint"]
+    #     name = item["name"]
+    #     location = item["location"]
+    #     kind = item["kind"]
+
+    #     services[name] = {
+    #         "name": name,
+    #         "endpoint": endpoint,
+    #         "location": location,
+    #         "kind": kind
+    #     }
+    #     logging.info(f"Found service {name} at location {location}")
+    
+    
+    # logging.info(f"Command {command} executed with exit code {exit_code} and result {ret}`")
+
+    logging.info('Python timer trigger function... ')
+    try:
+        start_time = time.time()
+        run_test(model_family="gpt-4")
+        end_time = time.time()
+        duration1 = end_time - start_time
+
+        start_time = time.time()
+        run_test(model_family="gpt-35-turbo")
+        end_time = time.time()
+        duration2 = end_time - start_time
+        duration_all = duration1 + duration2
+        logging.info('All tests run succesfully: Test for gpt-4 took {duration1} seconds, Test for gpt-35-turbo took {duration2} seconds. Total duration {duration_all} seconds.')
+    except Exception as e:
+        logging.error(f"Error running tests: {e}")
+        raise e 
