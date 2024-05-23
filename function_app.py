@@ -362,7 +362,7 @@ def openai_status_run(req: func.HttpRequest) -> func.HttpResponse:
 
 
 
-@app.timer_trigger(schedule="0 5 * * * *", arg_name="myTimer", run_on_startup=True,
+@app.timer_trigger(schedule="0 0 */2 * * *", arg_name="myTimer", run_on_startup=True,
               use_monitor=False) 
 def openai_status_run_scheduled(myTimer: func.TimerRequest) -> None:
     
@@ -412,8 +412,14 @@ def openai_status_run_scheduled(myTimer: func.TimerRequest) -> None:
         run_test(model_family="gpt-35-turbo")
         end_time = time.time()
         duration2 = end_time - start_time
-        duration_all = duration1 + duration2
-        logging.info('All tests run succesfully: Test for gpt-4 took {duration1} seconds, Test for gpt-35-turbo took {duration2} seconds. Total duration {duration_all} seconds.')
+
+        start_time = time.time()
+        run_test(model_family="gpt-4o")
+        end_time = time.time()
+        duration3 = end_time - start_time
+
+        duration_all = duration1 + duration2 + duration3
+        logging.info('All tests run succesfully: Test for gpt-4 took {duration1} seconds, Test for gpt-35-turbo took {duration2} seconds. Test for gpt-4o took {duration3}. Total duration {duration_all} seconds.')
     except Exception as e:
         logging.error(f"Error running tests: {e}")
         raise e 
