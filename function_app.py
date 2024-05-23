@@ -97,7 +97,7 @@ def get_services(verbose=False):
 
         services[openai_name]["key"] = key
     
-    print(f"Found {len(services)} services.")
+    logging.warn(f"Found {len(services)} services.")
     if verbose:
         for key, value in services.items():
             print(key)
@@ -125,23 +125,26 @@ def get_deployments(name):
     # json_data = get_deployments("openaimma-swedencentral")
     deployments = {}
     deployments[name] = []
-    for item in json_data:  
-        # print(item["name"], item["properties"]["capabilities"]["embeddings"]) 
+    try:
+        for item in json_data:  
+            # print(item["name"], item["properties"]["capabilities"]["embeddings"]) 
 
-        if "embeddings" in item["properties"]["capabilities"]:
-            # print(item["name"], item["properties"]["capabilities"]["embeddings"])
-            # deployments[item["name"]] = "embeddings"
-            deployments[name].append({"id": item["name"], "type": "embeddings", "model": item["properties"]["model"]["name"], "version": item["properties"]["model"]["version"]})
+            if "embeddings" in item["properties"]["capabilities"]:
+                # print(item["name"], item["properties"]["capabilities"]["embeddings"])
+                # deployments[item["name"]] = "embeddings"
+                deployments[name].append({"id": item["name"], "type": "embeddings", "model": item["properties"]["model"]["name"], "version": item["properties"]["model"]["version"]})
 
-        elif "chatCompletion" in item["properties"]["capabilities"]:
-            # print(item["name"], item["properties"]["capabilities"]["chatCompletion"])
-            # deployments[item["name"]] = "chatCompletion"
-            deployments[name].append({"id": item["name"], "type": "chatCompletion", "model": item["properties"]["model"]["name"], "version": item["properties"]["model"]["version"]})
-        else:
-            print(item["name"], "No capabilities")
-            # deployments[item["name"]] = "N/A"
-            deployments[name].append({"id": item["name"], "type": "N/A", "model": item["properties"]["model"]["name"], "version": item["properties"]["model"]["version"]})
-
+            elif "chatCompletion" in item["properties"]["capabilities"]:
+                # print(item["name"], item["properties"]["capabilities"]["chatCompletion"])
+                # deployments[item["name"]] = "chatCompletion"
+                deployments[name].append({"id": item["name"], "type": "chatCompletion", "model": item["properties"]["model"]["name"], "version": item["properties"]["model"]["version"]})
+            else:
+                print(item["name"], "No capabilities")
+                # deployments[item["name"]] = "N/A"
+                deployments[name].append({"id": item["name"], "type": "N/A", "model": item["properties"]["model"]["name"], "version": item["properties"]["model"]["version"]})
+    except Exception as e:
+        logging.error(f"Error getting deployments: {e}")
+        pass
     
     return deployments
 
@@ -160,7 +163,7 @@ def test_services(services, model_family = "gpt-4", verbose=False):
     for service_name, value in services.items():
         # print(service_name, details)
         if verbose:
-            print(f"Running tests for service {service_name}")
+            logging.warn(f"Running tests for service {service_name}")
 
         deployments = get_deployments(service_name)
         
@@ -256,7 +259,7 @@ def run_test(model_family = "gpt-4", filter_to_regions = []):
 
     print(f"Testing all services for model family {model_family}")
     # call_log = test_services(services_filtered)
-    call_log = test_services(services, model_family)
+    call_log = test_services(services, model_family, verbose=True)
 
     # create pandas dataframe from call_log
     df = pd.DataFrame(call_log)
@@ -274,21 +277,21 @@ def run_test(model_family = "gpt-4", filter_to_regions = []):
 
     storage_url = write_doc_on_blob_storage(csv_data, f"call_log{current_time}.csv")
 
-    print(f"Call log saved to {storage_url}")
+    logging.warn(f"Call log saved to {storage_url}")
 
     # get service_name name where duration max duration is
     max_duration = df["duration"].max()
     max_duration_service = df[df["duration"] == max_duration]["service"].values[0]
-    print(f"Max duration {max_duration} for service {max_duration_service}")
+    logging.info(f"Max duration {max_duration} for service {max_duration_service}")
 
     # get service_name name where duration is minimum
     min_duration = df["duration"].min()
     min_duration_service = df[df["duration"] == min_duration]["service"].values[0]
-    print(f"Min duration {min_duration} for service {min_duration_service}")
+    logging.info(f"Min duration {min_duration} for service {min_duration_service}")
 
     # get average duration
     avg_duration = df["duration"].mean()
-    print(f"Average duration {avg_duration}")
+    logging.info(f"Average duration {avg_duration}")
 
 
 
