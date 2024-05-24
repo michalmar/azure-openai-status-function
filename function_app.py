@@ -123,6 +123,13 @@ def get_deployments(name):
     json_data = az_cli_run(command)
 
     # json_data = get_deployments("openaimma-swedencentral")
+
+    # logging.info(f"Found deployments for service {name}: {json_data}")
+    # check if json_data is iterable
+    if not isinstance(json_data, list):
+        logging.error(f"Error getting deployments json data not iterable: {json_data}")
+        deployments[name] = []
+        return deployments
     deployments = {}
     deployments[name] = []
     try:
@@ -157,21 +164,36 @@ def get_chat_deployments(deployments, service_name, model_family = None):
 
     return chat_deployments
 
-def test_services(services, model_family = "gpt-4", verbose=False):
+def get_deployments_all(services, verbose=False):
+    deployments = {}
+    for service_name, value in services.items():
+        # print(service_name, value)
+        _deployments = get_deployments(service_name)
+        if verbose:
+            logging.info(f"Found {len(_deployments[service_name])} deployments for service {service_name}")
+
+        if len(_deployments[service_name]) == 0:
+            logging.info(f"No deployments found for service {service_name}.")
+        else:
+            deployments[service_name] = _deployments[service_name]
+
+    return deployments
+
+def test_services(services, deployments, model_family = "gpt-4", verbose=False):
 
     call_log = []
     for service_name, value in services.items():
         # print(service_name, details)
-        if verbose:
-            logging.warn(f"Running tests for service {service_name}")
+        # if verbose:
+        #     logging.info(f"Running tests for service {service_name}")
 
-        deployments = get_deployments(service_name)
+        # deployments = get_deployments(service_name)
         
-        if verbose:
-            print(f"Found {len(deployments[service_name])} deployments for service {service_name}")
+        # if verbose:
+        #     print(f"Found {len(deployments[service_name])} deployments for service {service_name}")
 
         if len(deployments[service_name]) == 0:
-            print(f"No deployments found for service {service_name}.")
+            logging.warn(f"No deployments found for service {service_name}.")
             continue
 
         chat_deployments = get_chat_deployments(deployments, service_name, model_family)
@@ -242,9 +264,9 @@ def test_services(services, model_family = "gpt-4", verbose=False):
     return call_log
 
 # model_family = "gpt-35-turbo"
-def run_test(model_family = "gpt-4", filter_to_regions = []):
+def run_test(services, deployments, model_family = "gpt-4", filter_to_regions = []):
     print("Preparing to test services...")
-    services = get_services(verbose=True)
+    # services = get_services(verbose=True)
 
     if len(filter_to_regions)>0:
         regions = filter_to_regions
@@ -259,7 +281,7 @@ def run_test(model_family = "gpt-4", filter_to_regions = []):
 
     print(f"Testing all services for model family {model_family}")
     # call_log = test_services(services_filtered)
-    call_log = test_services(services, model_family, verbose=True)
+    call_log = test_services(services, deployments, model_family, verbose=True)
 
     # create pandas dataframe from call_log
     df = pd.DataFrame(call_log)
@@ -272,26 +294,28 @@ def run_test(model_family = "gpt-4", filter_to_regions = []):
     current_time = time.strftime("%Y%m%d-%H%M%S")
     # df.to_csv(f"call_log{current_time}.csv", index=False)
 
-    # Convert DataFrame to CSV string
-    csv_data = df.to_csv(index=False)
+    return df
 
-    storage_url = write_doc_on_blob_storage(csv_data, f"call_log{current_time}.csv")
+    # # Convert DataFrame to CSV string
+    # csv_data = df.to_csv(index=False)
 
-    logging.warn(f"Call log saved to {storage_url}")
+    # storage_url = write_doc_on_blob_storage(csv_data, f"call_log{current_time}.csv")
 
-    # get service_name name where duration max duration is
-    max_duration = df["duration"].max()
-    max_duration_service = df[df["duration"] == max_duration]["service"].values[0]
-    logging.info(f"Max duration {max_duration} for service {max_duration_service}")
+    # logging.warn(f"Call log saved to {storage_url}")
 
-    # get service_name name where duration is minimum
-    min_duration = df["duration"].min()
-    min_duration_service = df[df["duration"] == min_duration]["service"].values[0]
-    logging.info(f"Min duration {min_duration} for service {min_duration_service}")
+    # # get service_name name where duration max duration is
+    # max_duration = df["duration"].max()
+    # max_duration_service = df[df["duration"] == max_duration]["service"].values[0]
+    # logging.info(f"Max duration {max_duration} for service {max_duration_service}")
 
-    # get average duration
-    avg_duration = df["duration"].mean()
-    logging.info(f"Average duration {avg_duration}")
+    # # get service_name name where duration is minimum
+    # min_duration = df["duration"].min()
+    # min_duration_service = df[df["duration"] == min_duration]["service"].values[0]
+    # logging.info(f"Min duration {min_duration} for service {min_duration_service}")
+
+    # # get average duration
+    # avg_duration = df["duration"].mean()
+    # logging.info(f"Average duration {avg_duration}")
 
 
 
@@ -341,19 +365,20 @@ def openai_status_run(req: func.HttpRequest) -> func.HttpResponse:
     #         name = req_body.get('name')
     
 
-    start_time = time.time()
-    run_test(model_family="gpt-4")
-    end_time = time.time()
-    duration1 = end_time - start_time
+    # start_time = time.time()
+    # run_test(model_family="gpt-4")
+    # end_time = time.time()
+    # duration1 = end_time - start_time
 
-    start_time = time.time()
-    run_test(model_family="gpt-35-turbo")
-    end_time = time.time()
-    duration2 = end_time - start_time
-    duration_all = duration1 + duration2
+    # start_time = time.time()
+    # run_test(model_family="gpt-35-turbo")
+    # end_time = time.time()
+    # duration2 = end_time - start_time
+    # duration_all = duration1 + duration2
     
 
-    return func.HttpResponse(f"All tests run succesfully: Test for gpt-4 took {duration1} seconds, Test for gpt-35-turbo took {duration2} seconds. Total duration {duration_all} seconds.")
+    # return func.HttpResponse(f"All tests run succesfully: Test for gpt-4 took {duration1} seconds, Test for gpt-35-turbo took {duration2} seconds. Total duration {duration_all} seconds.")
+    return func.HttpResponse(f"Not implemented.")
 
     # if name:
     #     return func.HttpResponse(f"Helloss!!!, {name}. This HTTP triggered function executed successfully.")
@@ -378,51 +403,73 @@ def openai_status_run_scheduled(myTimer: func.TimerRequest) -> None:
     
     command = f"az login --service-principal -u {AZURE_APP_ID} -p {AZURE_APP_SECRET} --tenant {AZURE_TENANT_ID}"
     json_data = az_cli_run(command, verbose = False)
-    # for item in json_data:
-    #     print(item)
-    
-    # command = "az cognitiveservices account list -g rg-ai-openai"
-    # ret = az_cli_run(command)
 
-    # services = {}
+    logging.info(f"Succesfully Logged in.")
 
-    # for item in json_data:    
-
-    #     endpoint = item["properties"]["endpoint"]
-    #     name = item["name"]
-    #     location = item["location"]
-    #     kind = item["kind"]
-
-    #     services[name] = {
-    #         "name": name,
-    #         "endpoint": endpoint,
-    #         "location": location,
-    #         "kind": kind
-    #     }
-    #     logging.info(f"Found service {name} at location {location}")
-    
-    
-    # logging.info(f"Command {command} executed with exit code {exit_code} and result {ret}`")
-
-    logging.info('Python timer trigger function... ')
     try:
-        start_time = time.time()
-        run_test(model_family="gpt-4")
-        end_time = time.time()
-        duration1 = end_time - start_time
-
-        start_time = time.time()
-        run_test(model_family="gpt-35-turbo")
-        end_time = time.time()
-        duration2 = end_time - start_time
-
-        start_time = time.time()
-        run_test(model_family="gpt-4o")
-        end_time = time.time()
-        duration3 = end_time - start_time
-
-        duration_all = duration1 + duration2 + duration3
-        logging.info('All tests run succesfully: Test for gpt-4 took {duration1} seconds, Test for gpt-35-turbo took {duration2} seconds. Test for gpt-4o took {duration3}. Total duration {duration_all} seconds.')
+        services = get_services(verbose=True)
     except Exception as e:
-        logging.error(f"Error running tests: {e}")
-        raise e 
+        logging.error(f"Error getting services: {e}")
+        services = None
+    
+    try:
+        deployments = get_deployments_all(services, verbose=True)
+    except Exception as e:
+        logging.error(f"Error getting deployments: {e}")
+        deployments = None
+    
+    if services is not None and deployments is not None:
+        logging.info('Python timer trigger function... ')
+        try:
+            # Initialize an empty DataFrame
+            combined_df = pd.DataFrame()
+
+            model_families = ["gpt-4", "gpt-35-turbo", "gpt-4o"]
+            total_duration = 0
+            for model_family in model_families:
+                start_time = time.time()
+                temp_df = run_test(services, deployments, model_family=model_family)
+                combined_df = pd.concat([combined_df, temp_df], ignore_index=True)
+                end_time = time.time()
+                duration = end_time - start_time
+                total_duration += duration
+                logging.info(f'Test for {model_family} took {duration} seconds.')
+
+
+
+            # start_time = time.time()
+            # temp_df = run_test(services, deployments, model_family="gpt-4")
+            # combined_df = pd.concat([combined_df, temp_df], ignore_index=True)
+            # end_time = time.time()
+            # duration1 = end_time - start_time
+
+            # start_time = time.time()
+            # temp_df = run_test(services, deployments, model_family="gpt-35-turbo")
+            # combined_df = pd.concat([combined_df, temp_df], ignore_index=True)
+            # end_time = time.time()
+            # duration2 = end_time - start_time
+
+            # start_time = time.time()
+            # temp_df = run_test(services, deployments, model_family="gpt-4o")
+            # combined_df = pd.concat([combined_df, temp_df], ignore_index=True)
+            # end_time = time.time()
+            # duration3 = end_time - start_time
+
+
+             # Convert DataFrame to CSV string
+            csv_data = combined_df.to_csv(index=False)
+            current_time = time.strftime("%Y%m%d-%H%M%S")
+            storage_url = write_doc_on_blob_storage(csv_data, f"call_log{current_time}.csv")
+
+            # logging.info(f"Call log saved to {storage_url}")
+
+            # duration_all = duration1 + duration2 + duration3
+            # logging.info(f'All tests run succesfully: Test for gpt-4 took {duration1} seconds, Test for gpt-35-turbo took {duration2} seconds. Test for gpt-4o took {duration3}. Total duration {duration_all} seconds.')
+            logging.info(f'All tests run succesfully: Total duration {total_duration} seconds. Call log saved to {storage_url}.')
+        except Exception as e:
+            logging.error(f"Error running tests: {e}")
+            raise e 
+    else:
+        logging.error("No services found. Exiting...")
+        raise Exception("No services found. Exiting...")
+    
