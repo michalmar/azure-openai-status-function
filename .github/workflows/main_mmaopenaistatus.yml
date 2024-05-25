@@ -21,22 +21,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: 'Run Azure CLI commands'
-        run: |
-          az resource update --resource-group rg-ai-openai --name scm --namespace Microsoft.Web --resource-type basicPublishingCredentialsPolicies --parent sites/mmaopenaistats --set properties.allow=true
-
-      # - name: Run Azure CLI script
-      #   uses: azure/CLI@v1
-      #   with:
-      #     inlineScript: |
-      #       az account set --subscription "0ceceb3e-768b-4c51-982c-25611c26208f"
-      #       az resource update --resource-group rg-ai-openai --name scm --namespace Microsoft.Web --resource-type basicPublishingCredentialsPolicies --parent sites/mmaopenaistats --set properties.allow=true
-
       - name: Setup Python version
         uses: actions/setup-python@v1
         with:
@@ -85,6 +69,10 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: 'Change SCM settings to allow deployment from GitHub Actions'
+        run: |
+          az resource update --resource-group rg-ai-openai --name scm --namespace Microsoft.Web --resource-type basicPublishingCredentialsPolicies --parent sites/mmaopenaistats --set properties.allow=true
 
 
       - name: 'Deploy to Azure Functions'
