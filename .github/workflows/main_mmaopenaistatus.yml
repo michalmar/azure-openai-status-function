@@ -31,6 +31,7 @@ jobs:
         with:
           azcliversion: 2.0.72
           inlineScript: |
+            az account set --subscription "0ceceb3e-768b-4c51-982c-25611c26208f"
             az resource update --resource-group rg-ai-openai --name scm --namespace Microsoft.Web --resource-type basicPublishingCredentialsPolicies --parent sites/mmaopenaistats --set properties.allow=true
 
       - name: Setup Python version
